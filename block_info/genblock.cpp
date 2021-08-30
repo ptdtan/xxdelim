@@ -35,7 +35,7 @@ namespace blockinfo {
       uint8_t *shuffle_digits = block->shuffle_digits;
 
       map<uint8_t, int> ndigits_map = {{ (uint8_t) Conversion::SSE2Digits, 2},
-                                        {(uint8_t) Conversion::SSE3Digits, 3},
+                                        {(uint8_t) Conversion::SSE3Digits, 4},
                                         {(uint8_t) Conversion::SSE4Digits, 4},
                                         {(uint8_t) Conversion::SSE8Digits, 8}
                                       };
@@ -78,14 +78,14 @@ namespace blockinfo {
             break;
         }
         n = min(maxcount[i], n);
-        cout << "routine:" << routines[i] << " count:" << n << endl;
+        // cout << "routine:" << routines[i] << " count:" << n << endl;
         if (n > nmax) {
           nmax = n;
           best = routines[i];
           total_skip = spanlist[n - 1].second + 2; // the last accepted span end, then advance 2 to the next digit
         }
       }
-      cout << "best:" << best <<endl;
+      // cout << "best:" << best <<endl;
       switch (best) {
         case 1:
          r = Conversion::SSE1Digit;
@@ -138,15 +138,15 @@ namespace blockinfo {
              if (blocks[k].conversion_routine != Conversion::Scalar) {
                gen_shuffle_array(spanlist, blocks.data() + k); // get shuffle array
              }
-             cout << bitset<16>(kk) << endl;
-             for (int i = 0 ; i < spanlist.size(); ++i) {
+            //  cout << bitset<16>(kk) << endl;
+            //  for (int i = 0 ; i < spanlist.size(); ++i) {
                 // cout << "span (" << spanlist[i].first  << "," << spanlist[i].second  << ")" << endl;
-             }
+            // }
              // cout << "shuffle array ";
-             for (int i = 0; i < 16; ++i) {
-               cout << (int) blocks[k].shuffle_digits[i] << " ";
-             }
-             cout << endl;
+             // for (int i = 0; i < 16; ++i) {
+             //   cout << (int) blocks[k].shuffle_digits[i] << " ";
+             // }
+             // cout << endl;
              // cout << "total skip: " << int(blocks[k].total_skip) << endl;
              // cout << "first skip: " << int(blocks[k].first_skip) << endl;
       }   
