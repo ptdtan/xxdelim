@@ -2,33 +2,16 @@
 #include <vector>
 #include <iostream>
 #include <bitset>
+#include <map>
+#include <x86intrin.h>
+
+#include "genblock.hpp"
 
 using namespace std;
+
 namespace blockinfo {
   typedef vector<pair<int, int> > spanlist_t;
-  // Reference of the struct and enum : https://github.com/WojciechMula/parsing-int-series/blob/master/include/block_info.h
-  enum class Conversion: uint8_t {
-      Empty,
-      SSE1Digit,
-      SSE2Digits,
-      SSE3Digits,
-      SSE4Digits,
-      SSE8Digits,
-      Scalar
-  };
-
-  struct BlockInfo {
-      uint8_t     first_skip;
-      uint8_t     total_skip;
-      uint8_t     element_count;
-      Conversion  conversion_routine;
-      uint16_t    invalid_sign_mask; // for signed parsing
-      uint8_t     shuffle_digits[16];
-      uint8_t     shuffle_signs[16]; // for signed parsing
-
-      void dump(FILE* file) const;
-  };
-
+  
     void getspan(uint16_t k, spanlist_t &spanlist) {
       vector<int> deli;
       if (k & (1 << 15)) {
@@ -46,12 +29,45 @@ namespace blockinfo {
       }
     }
 
-    uint8_t getroutine(spanlist_t spanlist) {
+    void gen_shuffle_array(spanlist_t spanlist, struct BlockInfo *block) {
+      Conversion r = block->conversion_routine;
+      int n = block->element_count;
+      uint8_t *shuffle_digits = block->shuffle_digits;
+
+      map<uint8_t, int> ndigits_map = {{ (uint8_t) Conversion::SSE2Digits, 2},
+                                        {(uint8_t) Conversion::SSE3Digits, 3},
+                                        {(uint8_t) Conversion::SSE4Digits, 4},
+                                        {(uint8_t) Conversion::SSE8Digits, 8}
+                                      };
+      memset(shuffle_digits, 0x80, 16);
+        if (r == Conversion::SSE1Digit) {
+          for (int i = 0; i < n; ++i) {
+            shuffle_digits[i] = spanlist[i].first;
+          }
+        } else { // 2, 3, 4, 8
+          int unit = ndigits_map[uint8_t(r)];
+          for (int i = 0; i < n; ++i) {
+            int k = spanlist[i].second;
+            int p = 1;
+            while (k >= spanlist[i].first) {
+              shuffle_digits[unit * (i + 1) - p] = k;
+              k--;
+              p++;
+            }
+           }
+        }
+    }
+
+    void getroutine(spanlist_t spanlist, struct BlockInfo *block) {
       vector<int> routines {0, 1, 2, 3, 4, 8};
-      vector<int> maxcount {0, 16, 8, 5, 4, 2};
+      vector<int> maxcount {0, 16, 8, 4, 4, 2};
+      // Since I only allow max value 99999999, 
+      // I can always parse at least one number
+      // so the default value of r is Scalar
       Conversion r = Conversion::Scalar;
       int nmax = 0;
       int best = 0;
+      int total_skip = spanlist[0].second + 2; // default total skip when parsing the first number
       for (int i = 1 ; i < routines.size(); ++i) {
         int n = 0;
         for (int j = 0; j < spanlist.size(); ++j) {
@@ -66,6 +82,7 @@ namespace blockinfo {
         if (n > nmax) {
           nmax = n;
           best = routines[i];
+          total_skip = spanlist[n - 1].second + 2; // the last accepted span end, then advance 2 to the next digit
         }
       }
       cout << "best:" << best <<endl;
@@ -86,16 +103,23 @@ namespace blockinfo {
          r = Conversion::SSE8Digits;
          break;
       }
-      return (uint8_t) r;
+      block->conversion_routine = r;
+      block->element_count = max(1, nmax); // at least one number when using Scalar parse
+      block->total_skip = total_skip;
+      if (block->conversion_routine == Conversion::Scalar) {
+        block->first_skip = spanlist[0].first;
+      }
     }
   /* Iterate from 0-65535 to find the valid pattern of single delimiter
    * Create the BlockInfo struct for the valid ones
    * Since there are just 2584 cases valid with single delimiter, I will compute the lookup table of block_info on the fly 
    */
-  void genblock(void) {
+  vector<BlockInfo> genblock(void) {
+    vector<BlockInfo> blocks(65536);
     int count = 0;
     for (int k = 0; k < 65536; ++k) {
       uint16_t kk = (uint16_t) k;
+      blocks[k].isvalid = 0;
       if ( !(kk & (kk >> 1)) && // is single-delimiter
            ! ((~( kk | (uint16_t) 0x7F) == (uint16_t)~(0x7F)) | // no more than 8 consecutive zeroes
            ((uint16_t) ~( kk | 0x803F) == (uint16_t)~(0x803F)) |
@@ -105,22 +129,30 @@ namespace blockinfo {
            ((uint16_t) ~( kk | 0xF803) == (uint16_t)~(0xF803)) |
            ((uint16_t) ~( kk | 0xFC01) == (uint16_t)~(0xFC01)) |
            ((uint16_t) ~( kk | 0xFE00) == (uint16_t)~(0xFE00)))) {
-           count++; 
-           spanlist_t spanlist;
-           getspan(kk, spanlist);
-           uint8_t r = getroutine(spanlist);
-           cout << "r:" << (int)r << endl;
-           cout << bitset<16>(kk) << endl;
-           for (int i = 0 ; i < spanlist.size(); ++i) {
-             cout << "span (" << spanlist[i].first  << "," << spanlist[i].second  << ")" << endl;
-           }
+             // cout << "new block===================================" << endl;
+             blocks[k].isvalid = 1;
+             count++; 
+             spanlist_t spanlist;
+             getspan(kk, spanlist); // get list of spans
+             getroutine(spanlist, blocks.data() + k); // get routine, total skip, first skip
+             if (blocks[k].conversion_routine != Conversion::Scalar) {
+               gen_shuffle_array(spanlist, blocks.data() + k); // get shuffle array
+             }
+             cout << bitset<16>(kk) << endl;
+             for (int i = 0 ; i < spanlist.size(); ++i) {
+                // cout << "span (" << spanlist[i].first  << "," << spanlist[i].second  << ")" << endl;
+             }
+             // cout << "shuffle array ";
+             for (int i = 0; i < 16; ++i) {
+               cout << (int) blocks[k].shuffle_digits[i] << " ";
+             }
+             cout << endl;
+             // cout << "total skip: " << int(blocks[k].total_skip) << endl;
+             // cout << "first skip: " << int(blocks[k].first_skip) << endl;
       }   
     }  
-    cout << "count: " << count << endl;
+    // cout << "count: " << count << endl;
+    return blocks;
   }
-}
-
-int main(void) {
-  blockinfo::genblock();
 }
 
