@@ -1,2 +1,8 @@
 *.o
 parsing-int-series/*
+.ccls-cache/
+*.swp
+*/*.swp
+block_info/.gitignore
+tags
+xxdelim
