@@ -1,4 +1,5 @@
+CXXFLAGS += -Wall -msse4.2 -std=c++11 
 all:
-	g++ -msse4.2 -std=c++11 -c main.cpp
-	g++ -msse4.2 -std=c++11 -c block_info/genblock.cpp
-	g++ -o xxdelim main.o genblock.o -msse4.2 -std=c++11
+	g++ ${CXXFLAGS} -c main.cpp
+	g++ ${CXXFLAGS} -c block_info/genblock.cpp
+	g++ ${CXXFLAGS} -o xxdelim main.o genblock.o 
