@@ -103,43 +103,55 @@ namespace sse {
     }
    
     template <typename INSERTER> 
-    void scalar_parse_unsigned(const char *s, int size, const char sep, INSERTER output) {
+    int scalar_parse_unsigned(char *s, int size, const char sep, INSERTER output) {
      const char *end = s + size;
      const char *start = s;
      uint32_t prev = 0;  
+     char *last_sep = NULL;
      while (s < end) {
-       if (*s == sep) {
-         if (*(s + 1) == sep) {
+       if (*s == sep || *s == '\n') {
+         if (*(s + 1) == sep || *(s + 1) == '\n') {
           throw std::runtime_error("Double separator!");
          }
          if (s != start) {
           *output++ = prev;  
            prev = 0;
+           last_sep = s;
          } 
        } else {
          prev = prev * 10 + uint8_t(*s - '0');
        }
        s++;
      }
-     if (prev != 0) {
-       *output++ = prev;
+     if (last_sep == NULL) { // didn't parsed anything
+       return 0; 
+     } else {
+       return last_sep - start;
      }
     }
 
     template <typename INSERTER>
-    void sse_parse_unsigned(const char *string, const char sep, uint32_t size, INSERTER output) {
+    size_t sse_parse_unsigned(char *string, const char sep, uint32_t size, INSERTER output) {
       std::vector<blockinfo::BlockInfo> block_info = blockinfo::genblock();
 
-      char *data = const_cast<char*>(string);
+      char *data = string;
       char *end = data + size;
       const __m128i vm = _mm_setr_epi8(15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0);
 
       while (data + 16 < end) {
-        for (int i = 0; i < 16; ++i) {
-          std::cout << *(data + i);
+        // for (int i = 0; i < 16; ++i) {
+        //  std::cout << *(data + i);
+        // }
+        //  std::cout << std::endl;
+        const __m128i _input = _mm_loadu_si128(reinterpret_cast<__m128i*>(data));
+        uint16_t nl_mask = sse_utils::newline_mask(_input);
+        if (nl_mask != 0) {
+          for (int ni = 0; ni < 16; ++ni) {
+            if (data[ni] == '\n')
+              data[ni] = sep;
+          } 
         }
-        std::cout << std::endl;
-        const __m128i  input = _mm_loadu_si128(reinterpret_cast<__m128i*>(data));
+        const __m128i input = _mm_loadu_si128(reinterpret_cast<__m128i*>(data));
         const __m128i  t0 = sse_utils::decimal_digits_mask(input);
         const __m128i  delim_mask = sse_utils::delimiter_mask(input, sep);
         uint16_t delmask16  = _mm_movemask_epi8(delim_mask);      
@@ -148,18 +160,21 @@ namespace sse {
         
         const __m128i tmp = _mm_shuffle_epi8(delim_mask, vm);
         delmask16 = _mm_movemask_epi8(tmp);
-        std::cout << "delmask reverse: " << std::bitset<16>(delmask16) << std::endl;
-        if (is_valid == 0xffff) {
-          blockinfo::BlockInfo bi = block_info[delmask16];
-          std::cout << "total: "  << int(bi.element_count) << std::endl;
-          assert(bi.isvalid);
+        // std::cout << "delmask reverse: " << std::bitset<16>(delmask16) << std::endl;
+        /* digits and delimiter are exclusisve && pattern is valid
+         * 1. no consecutive delimiters
+         * 2. no more than 8 consecutive zeroes
+         */
+        blockinfo::BlockInfo bi = block_info[delmask16];
+        if (is_valid == 0xffff && bi.isvalid) { 
+          // std::cout << "total: "  << int(bi.element_count) << std::endl;
           const __m128i shuffle_digits = _mm_loadu_si128((const __m128i*)bi.shuffle_digits);
           const __m128i shuffled = _mm_shuffle_epi8(input, shuffle_digits);
 
-          for (int i = 0; i < 16; ++i) {
-            std::cout << (int)bi.shuffle_digits[i] << " ";
-          }
-          std::cout << std::endl;
+           // for (int i = 0; i < 16; ++i) {
+           //  std::cout << (int)bi.shuffle_digits[i] << " ";
+           // }
+           // std::cout << std::endl;
 
           if (bi.conversion_routine == blockinfo::Conversion::SSE1Digit) {
 
@@ -184,7 +199,6 @@ namespace sse {
           } else {
             // scalar
             scalar_parse_unsigned(data, bi.total_skip, sep, output);
-            output++;
           }
           data += bi.total_skip;
           // output += bi.element_count;
@@ -192,7 +206,10 @@ namespace sse {
           throw std::runtime_error("Invalid input!");
         }
       }
-      //process the tail
-            scalar_parse_unsigned(data, end - data, sep, output);
+      // std::cout << "parsed by sse: " << data - string << std::endl;
+      size_t parsed = scalar_parse_unsigned(data, end - data, sep, output);
+      // std::cout << "parsed by scalar: " << parsed << std::endl;
+      
+      return (data + parsed) - string + 1;
     }
 }

@@ -15,6 +15,10 @@ namespace sse_utils {
         return _mm_andnot_si128(t0, t1); // x <= '9' and x >= '0'
     }
 
+    uint16_t newline_mask(const __m128i input) {
+        const __m128i mask = _mm_cmpeq_epi8(input, _mm_set1_epi8('\n'));
+        return _mm_movemask_epi8(mask);
+    }
     __m128i delimiter_mask(const __m128i input, uint8_t d) {
         const __m128i delim = _mm_set1_epi8(d);
         return _mm_cmpeq_epi8(input, delim);
