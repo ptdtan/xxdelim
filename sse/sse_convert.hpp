@@ -102,22 +102,20 @@ namespace sse {
       *output++ = prev;
     }
    
-    // Please do output-- before using this function 
     template <typename INSERTER> 
     void scalar_parse_unsigned(const char *s, int size, const char sep, INSERTER output) {
      const char *end = s + size;
      const char *start = s;
      uint32_t prev = 0;  
-     int is_first = 1;
      while (s < end) {
-       is_first = (int) (s == start);
        if (*s == sep) {
          if (*(s + 1) == sep) {
           throw std::runtime_error("Double separator!");
          }
-         *(output + (1 - is_first)) = (*(output)) * is_first + prev;
-         output += (1 - is_first);
-         prev = 0;
+         if (s != start) {
+          *output++ = prev;  
+           prev = 0;
+         } 
        } else {
          prev = prev * 10 + uint8_t(*s - '0');
        }
@@ -189,7 +187,7 @@ namespace sse {
             output++;
           }
           data += bi.total_skip;
-          output += bi.element_count;
+          // output += bi.element_count;
         } else {
           throw std::runtime_error("Invalid input!");
         }
