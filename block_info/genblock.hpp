@@ -13,7 +13,7 @@ namespace blockinfo {
   };
 
 
-struct BlockInfo {
+  struct BlockInfo {
       uint8_t     first_skip;
       uint8_t     total_skip;
       uint8_t     element_count;
@@ -26,5 +26,6 @@ struct BlockInfo {
       int isvalid;
   };
 
-std::vector<BlockInfo> genblock(void);
+  int is_valid(uint16_t kk);
+  std::vector<BlockInfo> genblock(void);
 }

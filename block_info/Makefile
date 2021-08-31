@@ -1,2 +1,5 @@
+CXXFLAGS=-Wall -msse4.2 -std=c++11
 all:
-	g++ -msse4.2 -std=c++11 -c genblock.cpp
+	g++ ${CXXFLAGS} -c genblock.cpp
+	g++ ${CXXFLAGS} -c testgenblock.cpp
+	g++ ${CXXFLAGS} -o testgenblock genblock.o testgenblock.o
