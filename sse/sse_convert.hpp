@@ -133,7 +133,7 @@ namespace sse {
      char *last_sep = NULL;
      while (s < end) {
        if (*s == sep || *s == '\n') {
-         if (*(s + 1) == sep || *(s + 1) == '\n') {
+         if (!(*(s + 1) == '\n' && *s == '\n')) { // tolerate two \n
           throw std::runtime_error("Double separator!");
          }
          if (s != start) {
