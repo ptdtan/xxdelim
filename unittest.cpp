@@ -17,17 +17,17 @@ int test01(void) {
   char cdata[data.size()];
   strcpy(cdata, data.c_str());
   std::vector<uint32_t> truth{1,22,333,4444,55555,666666,7777777,88888888,999999999,0,0,10,0,1000};
-  std::vector<uint32_t> output;
+  struct int_arr_t *output = init_int_arr();
   int is_failed = 0;
   try {
-    sse_parse_unsigned(cdata, ',', data.size(), std::back_inserter(output));
+    sse_parse_unsigned(cdata, ',', data.size(), output);
   } catch (const std::runtime_error& error) {
     std::cout << FAILED << std::endl;
     return 1;
   }
-  for (int i = 0 ; i < output.size(); ++i) {
-    std::cout << output[i] << " ";
-    if (truth[i] != output[i]) {
+  for (int i = 0 ; i < output->size; ++i) {
+    std::cout << output->data[i] << " ";
+    if (truth[i] != output->data[i]) {
       std::cout << FAILED << std::endl;
       is_failed = 1;
     }
@@ -43,9 +43,9 @@ int test02(void) {
   std::string data("1,,22,333,4444,55555,666666,7777777,88888888,999999999,0,0,10,0,1000");
   char cdata[data.size()];
   strcpy(cdata, data.c_str());
-  std::vector<uint32_t> output;
+  struct int_arr_t *output = init_int_arr();
   try {
-    sse_parse_unsigned(cdata, ',', data.size(), std::back_inserter(output));
+    sse_parse_unsigned(cdata, ',', data.size(), output);
   } catch (const std::runtime_error& error) {
     std::cout << "Caugth runtime_error" << std::endl;
     std::cout << PASSED << std::endl;

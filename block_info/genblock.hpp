@@ -1,3 +1,5 @@
+#ifndef __BLOCK_INFO_H__
+#define __BLOCK_INFO_H__ 
 #include <vector>
 namespace blockinfo {
 
@@ -29,3 +31,5 @@ namespace blockinfo {
   int is_valid(uint16_t kk);
   std::vector<BlockInfo> genblock(void);
 }
+
+#endif

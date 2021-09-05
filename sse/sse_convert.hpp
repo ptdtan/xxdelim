@@ -8,6 +8,30 @@
 #include "sse_utils.hpp"
 #include "../block_info/genblock.hpp"
 
+#define INIT_SIZE (1 << 20)
+#define NEED_RESIZE 8
+
+struct int_arr_t {
+  uint32_t *data; 
+  size_t size;
+  size_t cap;
+};
+
+struct int_arr_t *init_int_arr(void) {
+  struct int_arr_t *a = (struct int_arr_t *) calloc(1, sizeof(struct int_arr_t));
+  a->cap = INIT_SIZE;
+  a->size = 0;
+  a->data = (uint32_t *) calloc(a->cap, sizeof(uint32_t));
+  return a;
+}
+
+void reverse_storage(struct int_arr_t *a) {
+  if (a->size + NEED_RESIZE >= a->cap) {
+    a->cap = a->cap * 1.5;
+    a->data = (uint32_t *) realloc(a->data, sizeof(uint32_t) * a->cap);
+  } 
+}
+
 namespace sse {
 
 #define SSE_ALIGN __attribute__ ((aligned (16)))
@@ -102,8 +126,7 @@ namespace sse {
       *output++ = prev;
     }
    
-    template <typename INSERTER> 
-    int scalar_parse_unsigned(char *s, int size, const char sep, INSERTER output) {
+    int scalar_parse_unsigned(char *s, int size, const char sep, struct int_arr_t *output) {
      const char *end = s + size;
      const char *start = s;
      uint32_t prev = 0;  
@@ -114,7 +137,8 @@ namespace sse {
           throw std::runtime_error("Double separator!");
          }
          if (s != start) {
-          *output++ = prev;  
+           output->data[output->size] = prev;
+           output->size++;
            prev = 0;
            last_sep = s;
          } 
@@ -130,8 +154,7 @@ namespace sse {
      }
     }
 
-    template <typename INSERTER>
-    size_t sse_parse_unsigned(char *string, const char sep, uint32_t size, INSERTER output) {
+    size_t sse_parse_unsigned(char *string, const char sep, uint32_t size, struct int_arr_t *output) {
       std::vector<blockinfo::BlockInfo> block_info = blockinfo::genblock();
 
       char *data = string;
@@ -139,10 +162,10 @@ namespace sse {
       const __m128i vm = _mm_setr_epi8(15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0);
 
       while (data + 16 < end) {
-        // for (int i = 0; i < 16; ++i) {
-        //  std::cout << *(data + i);
-        // }
-        //  std::cout << std::endl;
+
+        // dynamic allocation
+        reverse_storage(output);
+        
         const __m128i _input = _mm_loadu_si128(reinterpret_cast<__m128i*>(data));
         uint16_t nl_mask = sse_utils::newline_mask(_input);
         if (nl_mask != 0) {
@@ -167,34 +190,33 @@ namespace sse {
          */
         blockinfo::BlockInfo bi = block_info[delmask16];
         if (is_valid == 0xffff && bi.isvalid) { 
-          // std::cout << "total: "  << int(bi.element_count) << std::endl;
           const __m128i shuffle_digits = _mm_loadu_si128((const __m128i*)bi.shuffle_digits);
           const __m128i shuffled = _mm_shuffle_epi8(input, shuffle_digits);
 
-           // for (int i = 0; i < 16; ++i) {
-           //  std::cout << (int)bi.shuffle_digits[i] << " ";
-           // }
-           // std::cout << std::endl;
-
           if (bi.conversion_routine == blockinfo::Conversion::SSE1Digit) {
 
-              convert_1digit(shuffled, bi.element_count, output);
+              convert_1digit(shuffled, bi.element_count, output->data);
+              output->size += bi.element_count;
 
           } else if (bi.conversion_routine == blockinfo::Conversion::SSE2Digits) {
 
-              convert_2digits(shuffled, bi.element_count, output);
+              convert_2digits(shuffled, bi.element_count, output->data);
+              output->size += bi.element_count;
 
           } else if (bi.conversion_routine == blockinfo::Conversion::SSE3Digits) {
 
-              convert_3digits(shuffled, bi.element_count, output);
+              convert_3digits(shuffled, bi.element_count, output->data);
+              output->size += bi.element_count;
 
           } else if (bi.conversion_routine == blockinfo::Conversion::SSE4Digits) {
 
-              convert_4digits(shuffled, bi.element_count, output);
+              convert_4digits(shuffled, bi.element_count, output->data);
+              output->size += bi.element_count;
 
           } else if (bi.conversion_routine == blockinfo::Conversion::SSE8Digits) {
 
-              convert_8digits(shuffled, bi.element_count, output);
+              convert_8digits(shuffled, bi.element_count, output->data);
+              output->size += bi.element_count;
 
           } else {
             // scalar

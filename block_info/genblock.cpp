@@ -4,6 +4,7 @@
 #include <bitset>
 #include <map>
 #include <x86intrin.h>
+#include <string.h>
 
 #include "genblock.hpp"
 
