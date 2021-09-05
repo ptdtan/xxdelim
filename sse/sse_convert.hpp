@@ -133,7 +133,7 @@ namespace sse {
      char *last_sep = NULL;
      while (s < end) {
        if (*s == sep || *s == '\n') {
-         if (!(*(s + 1) == '\n' && *s == '\n')) { // tolerate two \n
+         if (*(s + 1) == sep && (s + 1) != end) { // tolerate two \n
           throw std::runtime_error("Double separator!");
          }
          if (s != start) {
@@ -154,8 +154,8 @@ namespace sse {
      }
     }
 
-    size_t sse_parse_unsigned(char *string, const char sep, uint32_t size, struct int_arr_t *output) {
-      std::vector<blockinfo::BlockInfo> block_info = blockinfo::genblock();
+    size_t sse_parse_unsigned(char *string, const char sep, uint32_t size,
+        std::vector<blockinfo::BlockInfo> &block_info, struct int_arr_t *output) {
 
       char *data = string;
       char *end = data + size;

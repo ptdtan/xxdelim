@@ -5,6 +5,7 @@
 #include <assert.h>
 #include <cstring>
 #include "sse/sse_convert.hpp"
+#include "block_info/genblock.hpp"
 
 #define FAILED "\033[1;33mFAILED\033[0m"
 #define PASSED "\033[1;32mPASSED\033[0m\n"
@@ -19,8 +20,10 @@ int test01(void) {
   std::vector<uint32_t> truth{1,22,333,4444,55555,666666,7777777,88888888,999999999,0,0,10,0,1000};
   struct int_arr_t *output = init_int_arr();
   int is_failed = 0;
+  std::vector<blockinfo::BlockInfo> block_info = blockinfo::genblock();
+
   try {
-    sse_parse_unsigned(cdata, ',', data.size(), output);
+    sse_parse_unsigned(cdata, ',', data.size(), block_info, output);
   } catch (const std::runtime_error& error) {
     std::cout << FAILED << std::endl;
     return 1;
@@ -44,8 +47,9 @@ int test02(void) {
   char cdata[data.size()];
   strcpy(cdata, data.c_str());
   struct int_arr_t *output = init_int_arr();
+  std::vector<blockinfo::BlockInfo> block_info = blockinfo::genblock();
   try {
-    sse_parse_unsigned(cdata, ',', data.size(), output);
+    sse_parse_unsigned(cdata, ',', data.size(), block_info, output);
   } catch (const std::runtime_error& error) {
     std::cout << "Caugth runtime_error" << std::endl;
     std::cout << PASSED << std::endl;
